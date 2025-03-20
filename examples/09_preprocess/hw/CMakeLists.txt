@@ -4,12 +4,12 @@ set(CYT_DIR ${CMAKE_SOURCE_DIR}/../../../)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CYT_DIR}/cmake)
 find_package(CoyoteHW REQUIRED)
 
-project(example_02_hls_vadd)
-message("*** Coyote Example 2: HLS Vector Add [Hardware Build] ***")
+project(example_09_preprocess)
+message("*** Coyote Example 9: Preprocessing for DLRM [Hardware Build] ***")
 
 # Enables two streams from host memory (CPU DDR)
 set(EN_STRM 1)
-set(N_STRM_AXI 2)
+set(N_STRM_AXI 1)
 
 # Disable card memory for this example
 set(EN_MEM 0)
