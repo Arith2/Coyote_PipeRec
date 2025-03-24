@@ -34,28 +34,31 @@ void hls_vadd (
 
 void LoadData(
     hls::stream<axi_s> &axi_in, 
-    hls::stream<ap_uint<512> >& stream_out 
+    hls::stream<axi_s>& stream_out 
 ) {
 #pragma HLS PIPELINE II=1
 #pragma HLS INLINE off
 
         axi_s x;
-        ap_uint<512> y;
+        // ap_uint<512> y;
 
         if(!axi_in.empty()) {
             x = axi_in.read();
-            y = x.data;
-            stream_out.write(y);
+            // y = x.data;
+            stream_out.write(x);
         }
 
 }
 
 void Dense_NegsToZero(
-    hls::stream<ap_uint<512> >& stream_in,
-    hls::stream<ap_uint<512> >& stream_out 
+    hls::stream<axi_s> >& stream_in,
+    hls::stream<axi_s> >& stream_out 
 ) {
 #pragma HLS PIPELINE II=1
 #pragma HLS INLINE off
+
+        axi_s axi_input_data;
+        axi_s axi_output_data;
 
         ap_uint<512> input_data;
         ap_uint<512> output_data;
@@ -63,7 +66,8 @@ void Dense_NegsToZero(
         Dense_NegsToZero:
         if(!stream_in.empty()) {
 
-            input_data = stream_in.read();
+            axi_input_data = stream_in.read();
+            input_data = axi_input_data.data;
 
             for (int k = 0; k < 16; k++) {
                 #pragma HLS unroll
@@ -77,18 +81,23 @@ void Dense_NegsToZero(
 
             }
 
+            axi_output_data.data = output_data;
+            axi_output_data.keep = axi_input_data.keep; 
+            axi_output_data.last = axi_input_data.last;
 			stream_out.write(output_data);
 		}
 
 }
 
 void Dense_Log(
-    hls::stream<ap_uint<512> >& stream_in,
-    hls::stream<ap_uint<512> >& stream_out 
+    hls::stream<axi_s> >& stream_in,
+    hls::stream<axi_s> >& stream_out 
 ) {
 #pragma HLS PIPELINE II=1
 #pragma HLS INLINE off
 
+    axi_s axi_input_data;
+    axi_s axi_output_data;
 
     ap_uint<512> input_data = 0;
     ap_uint<512> output_data = 0;
@@ -96,7 +105,8 @@ void Dense_Log(
     Dense_Log:
     if(!stream_in.empty()) {
 
-        input_data = stream_in.read();
+        axi_input_data = stream_in.read();
+        input_data = axi_input_data.data;
 
         for (int j = 0; j < 16; j++) {
             #pragma HLS unroll
@@ -110,17 +120,23 @@ void Dense_Log(
 
         }
 
-		stream_out.write(output_data);
+        axi_output_data.data = output_data;
+        axi_output_data.keep = axi_input_data.keep;
+        axi_output_data.last = axi_input_data.last;
+		stream_out.write(axi_output_data);
 	}
 
 }
 
 void Sparse_HexToIntMod(
-    hls::stream<ap_uint<512> >& stream_in,
-    hls::stream<ap_uint<512> >& stream_out
+    hls::stream<axi_s>& stream_in,
+    hls::stream<axi_s>& stream_out
 ) {
 #pragma HLS PIPELINE II=1
 #pragma HLS INLINE off
+
+    axi_s axi_input_data;
+    axi_s axi_output_data;
 
     ap_uint<512> input_data = 0;
     ap_uint<512> output_data = 0;
@@ -128,7 +144,8 @@ void Sparse_HexToIntMod(
     Sparse_HexToIntMod:
     if(!stream_in.empty()) {
 
-        input_data = stream_in.read();
+        axi_input_data = stream_in.read();
+        input_data = axi_input_data.data;
 
         for (int j = 0; j < 16; j++) {
             #pragma HLS unroll
@@ -138,14 +155,16 @@ void Sparse_HexToIntMod(
             output_data(32*j+31, 32*j) = tmp_output; 
 
         }
-
-		stream_out.write(output_data);
+        axi_output_data.data = output_data;
+        axi_output_data.keep = axi_input_data.keep;
+        axi_output_data.last = axi_input_data.last;
+		stream_out.write(axi_output_data);
 	}
 }
 
 void StoreData(
-    hls::stream<ap_uint<512> >& stream_in,
-    hls::stream<axi_s> &axi_out
+    hls::stream<axi_s>& stream_in,
+    hls::stream<axi_s>& axi_out
 ) {
 #pragma HLS PIPELINE II=1
 #pragma HLS INLINE off
@@ -156,10 +175,7 @@ void StoreData(
     StoreData:
     if(!stream_in.empty()) {
 
-		y.data = stream_in.read();
-		y.keep = 0xF;
-		y.id = 0;
-		y.last = 0;
+		y = stream_in.read();
 		axi_out.write(y);
 	}
 }
