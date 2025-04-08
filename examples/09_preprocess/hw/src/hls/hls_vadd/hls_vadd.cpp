@@ -11,16 +11,16 @@ void hls_vadd (
     #pragma HLS INTERFACE axis register port=axi_in name=s_axi_in
     #pragma HLS INTERFACE axis register port=axi_out name=m_axi_out
 
-    hls::stream<ap_uint<512> > stream_load;
+    hls::stream<data_t> stream_load;
 #pragma HLS stream variable=stream_load depth=64
 
-    hls::stream<ap_uint<512> > stream_zero;
+    hls::stream<data_t> stream_zero;
 #pragma HLS stream variable=stream_zero depth=64
 
-    hls::stream<ap_uint<512> > stream_log;
+    hls::stream<data_t> stream_log;
 #pragma HLS stream variable=stream_log depth=64
 
-    hls::stream<ap_uint<512> > stream_mod;
+    hls::stream<data_t> stream_mod;
 #pragma HLS stream variable=stream_mod depth=64
 
 #pragma HLS dataflow
@@ -37,7 +37,8 @@ void hls_vadd (
 
     Dense_Log(stream_zero, stream_log);
  
-    Sparse_HexToIntMod(stream_log, stream_mod); 
+    // Sparse_HexToIntMod(stream_log, stream_mod); 
+    Dense_Log(stream_log, stream_mod); 
  
     StoreData(stream_mod, axi_out);    
     
