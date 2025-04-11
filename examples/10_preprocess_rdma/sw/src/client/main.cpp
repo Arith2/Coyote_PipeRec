@@ -29,6 +29,9 @@
 #include <iostream>
 #include <cstdlib>
 
+// AMD GPU management & run-time libraries
+#include <hip/hip_runtime.h>
+
 // External library for easier parsing of CLI arguments by the executable
 #include <boost/program_options.hpp>
 
@@ -74,12 +77,12 @@ double run_bench(
     coyote::cBench bench(n_runs, 0);
     bench.execute(bench_fn, prep_fn);
 
-    // Functional correctness check
-    if (!operation) {
-        for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
-            assert(mem[i] == i);
-        }
-    }
+    // // Functional correctness check
+    // if (!operation) {
+    //     for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
+    //         assert(mem[i] == i);
+    //     }
+    // }
     
     // For writes, divide by 2, since that is sent two ways (from client to server and then from server to client)
     // Reads are one way, so no need to scale
@@ -115,9 +118,26 @@ int main(int argc, char *argv[])  {
      * One can use the function initRDMA, which will allocate the buffer and 
      * Exchange the necessary information with the server; the server calls the equivalent function but without the IP address
      */
+
+    // coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
+    // int *mem = (int *) coyote_thread.initRDMA(max_size, coyote::defPort, server_ip.c_str());
+
+    // GPU memory will be allocated on the GPU set using hipSetDevice(...)
+    std::cout << "DEBUG: About to select GPU device..." << std::endl;
+    if (hipSetDevice(DEFAULT_GPU_ID)) { 
+        std::cerr << "DEBUG: Failed to select GPU!" << std::endl;
+        throw std::runtime_error("Couldn't select GPU!"); 
+    }
+    std::cout << "DEBUG: Creating coyote thread..." << std::endl;
     coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
-    int *mem = (int *) coyote_thread.initRDMA(max_size, coyote::defPort, server_ip.c_str());
-    if (!mem) { throw std::runtime_error("Could not allocate memory; exiting..."); }
+    std::cout << "DEBUG: Initializing RDMA with GPU... buffer_size=" << max_size << ", port=" << coyote::defPort << ", server_ip=" << server_ip << std::endl;
+    int *mem = (int *) coyote_thread.initRDMA_GPU(max_size, coyote::defPort, server_ip.c_str());
+    std::cout << "DEBUG: RDMA initialization complete." << std::endl;
+
+    if (!mem) { 
+        std::cerr << "DEBUG: Memory allocation failed!" << std::endl;
+        throw std::runtime_error("Could not allocate memory; exiting..."); 
+    }
 
     // Benchmark sweep of latency and throughput
     PR_HEADER("RDMA BENCHMARK: CLIENT");

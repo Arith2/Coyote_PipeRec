@@ -4,14 +4,14 @@ set(CYT_DIR ${CMAKE_SOURCE_DIR}/../../../)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CYT_DIR}/cmake)
 find_package(CoyoteHW REQUIRED)
 
-project(example_08_perf_rdma)
-message("*** Coyote Example 8: Remote Direct Memory Access (RDMA) [Hardware Build] ***")
+project(example_10_preprocess_rdma)
+message("*** Coyote Example 10: Preprocessing of DLRM with RDMA ***")
 
 # Enables two streams from host memory (1 for requests, 1 for response)
 set(EN_STRM 1)
 set(N_STRM_AXI 2)
 
-# Incldue Coyote's RDMA stack during synthesis
+# Include Coyote's RDMA stack during synthesis
 set(EN_RDMA 1)
 
 # Number of vFPGAs (user applications)

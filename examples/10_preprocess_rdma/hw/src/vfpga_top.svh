@@ -33,7 +33,7 @@ end
 // Data streams for incoming RDMA READ RESPONSEs (from remote node to network stack to local host)
 // `AXISR_ASSIGN(axis_rreq_recv[0], axis_host_send[0])
 
- `ifdef EN_STRM
+
 hls_vadd inst_vadd(
     .s_axi_in_TDATA        (axis_rreq_recv[0].tdata),
     .s_axi_in_TKEEP        (axis_rreq_recv[0].tkeep),
@@ -53,10 +53,6 @@ hls_vadd inst_vadd(
     .ap_rst_n               (aresetn)
 );
 
-// There are two host streams, for both incoming and outgoing signals
-// The second outgoing is unused in this example, so tie it off
-// always_comb axis_host_send[1].tie_off_m();
-`endif
 
 // Data streams for outgoing RDMA READ RESPONSEs (from local host to network stack to remote node)
 `AXISR_ASSIGN(axis_host_recv[1], axis_rrsp_send[0])

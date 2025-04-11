@@ -7,3 +7,4 @@
 
 // Default vFPGA to assign cThreads to; for designs with one region (vFPGA) this is the only possible value
 #define DEFAULT_VFPGA_ID 0
+#define DEFAULT_GPU_ID 0

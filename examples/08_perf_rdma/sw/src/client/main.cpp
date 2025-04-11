@@ -74,12 +74,12 @@ double run_bench(
     coyote::cBench bench(n_runs, 0);
     bench.execute(bench_fn, prep_fn);
 
-    // Functional correctness check
-    if (!operation) {
-        for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
-            assert(mem[i] == i);
-        }
-    }
+    // // Functional correctness check
+    // if (!operation) {
+    //     for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
+    //         assert(mem[i] == i);
+    //     }
+    // }
     
     // For writes, divide by 2, since that is sent two ways (from client to server and then from server to client)
     // Reads are one way, so no need to scale

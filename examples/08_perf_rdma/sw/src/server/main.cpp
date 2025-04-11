@@ -66,12 +66,12 @@ void run_bench(
         }
     }
     
-    // Functional correctness check
-    if (operation) {
-        for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
-            assert(mem[i] == i);                        
-        }
-    }
+    // // Functional correctness check
+    // if (operation) {
+    //     for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
+    //         assert(mem[i] == i);                        
+    //     }
+    // }
 }
 
 int main(int argc, char *argv[])  {

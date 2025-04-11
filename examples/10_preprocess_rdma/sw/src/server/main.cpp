@@ -29,6 +29,8 @@
 #include <iostream>
 #include <cstdlib>
 
+// AMD GPU management & run-time libraries
+#include <hip/hip_runtime.h>
 // External library for easier parsing of CLI arguments by the executable
 #include <boost/program_options.hpp>
 
@@ -66,12 +68,12 @@ void run_bench(
         }
     }
     
-    // Functional correctness check
-    if (operation) {
-        for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
-            assert(mem[i] == i);                        
-        }
-    }
+    // // Functional correctness check
+    // if (operation) {
+    //     for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
+    //         assert(mem[i] == i);                        
+    //     }
+    // }
 }
 
 int main(int argc, char *argv[])  {
@@ -99,6 +101,12 @@ int main(int argc, char *argv[])  {
     // initRDMA is explained in more detail in client/main.cpp
     coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
     int *mem = (int *) coyote_thread.initRDMA(max_size, coyote::defPort);
+
+    // // GPU memory will be allocated on the GPU set using hipSetDevice(...)
+    // if (hipSetDevice(DEFAULT_GPU_ID)) { throw std::runtime_error("Couldn't select GPU!"); }
+    // coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
+    // int *mem = (int *) coyote_thread.initRDMA_GPU(max_size, coyote::defPort);
+
     if (!mem) { throw std::runtime_error("Could not allocate memory; exiting..."); }
 
     // Benchmark sweep; exactly like done in the client code

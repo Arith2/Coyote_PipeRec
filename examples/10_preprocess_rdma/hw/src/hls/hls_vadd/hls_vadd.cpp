@@ -25,6 +25,7 @@ void hls_vadd (
 
 #pragma HLS dataflow
 
+
     // LoadData: Read from the AXI stream and write to the internal stream
     // Dense_NegsToZero: Read from the internal stream and write to the internal stream
     // Dense_Log: Read from the internal stream and write to the internal stream
