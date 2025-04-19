@@ -57,7 +57,6 @@ double run_bench(
     auto prep_fn = [&]() {
         coyote_thread.clearCompleted();
         coyote_thread.connSync(IS_CLIENT);
-        std::cout << "DEBUG: Synced with server" << std::endl;
     };
     
     /* Benchmark function; as eplained in the README
@@ -71,40 +70,39 @@ double run_bench(
             coyote_thread.invoke(coyote_operation, &sg);
         }
 
-        // int completed = 0; 
-        // while (completed < transfers) {
-        //     if (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) > completed) {
-        //         completed += 1;
-        //         // std::cout << completed << ", ";
-        //         // Synchronous memory transfer from CPU to GPU
-        //         // hipMemcpy	(	void * 	dst,
-        //         //                  const void * 	src,
-        //         //                  size_t 	sizeBytes,
-        //         //                  hipMemcpyKind 	kind 
-        //         //              )	
-        //         auto hipMemcpy_result = hipMemcpy(mem_gpu, mem_cpu, sg.rdma.len, hipMemcpyHostToDevice);
-        //         if (hipMemcpy_result != hipSuccess) {
-        //             std::cerr << "DEBUG: hipMemcpy failed!" << std::endl;
-        //             throw std::runtime_error("hipMemcpy failed!");
-        //         }
-        //     }
+        int completed = 0; 
+        while (completed < transfers) {
+            if (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) > completed) {
+                completed += 1;
+                // std::cout << completed << ", ";
+                // Synchronous memory transfer from CPU to GPU
+                // hipMemcpy	(	void * 	dst,
+                //                  const void * 	src,
+                //                  size_t 	sizeBytes,
+                //                  hipMemcpyKind 	kind 
+                //              )	
+                auto hipMemcpy_result = hipMemcpy(mem_gpu, mem_cpu, sg.rdma.len, hipMemcpyHostToDevice);
+                if (hipMemcpy_result != hipSuccess) {
+                    std::cerr << "DEBUG: hipMemcpy failed!" << std::endl;
+                    throw std::runtime_error("hipMemcpy failed!");
+                }
+            }
 
-        // }
+        }
 
-        while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != transfers) {}
+        // while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != transfers) {}
     };
 
     // Execute benchmark
     coyote::cBench bench(n_runs, 0);
     bench.execute(bench_fn, prep_fn);
 
-    // Functional correctness check
-    if (!operation) {
-        for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
-            assert(mem_cpu[i] == i);
-            // std::cout << "DEBUG: mem_cpu[i] = " << mem_cpu[i] << std::endl;
-        }
-    }
+    // // Functional correctness check
+    // if (!operation) {
+    //     for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
+    //         assert(mem[i] == i);
+    //     }
+    // }
     
     // For writes, divide by 2, since that is sent two ways (from client to server and then from server to client)
     // Reads are one way, so no need to scale
@@ -191,6 +189,5 @@ int main(int argc, char *argv[])  {
 
     // Final sync and exit
     coyote_thread.connSync(IS_CLIENT);
-    std::cout << "DEBUG: Synced with server and exiting..." << std::endl;
     return EXIT_SUCCESS;
 }

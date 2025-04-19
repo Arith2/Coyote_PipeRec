@@ -493,7 +493,7 @@ struct csAlloc {
 	CoyoteAlloc alloc = { CoyoteAlloc::REG };
 
 	// Size of the allocated memory 
-	uint32_t size = { 0 };
+	uint64_t size = { 0 };
 
     // RDMA - making sure if this memory is allocated as a RDMA buffer 
     bool remote = { false };
@@ -580,13 +580,13 @@ struct syncSg {
 struct localSg {
     // Src
     void* src_addr = { nullptr };
-    uint32_t src_len = { 0 };
+    uint64_t src_len = { 0 };
     uint32_t src_stream = { strmHost };
     uint32_t src_dest = { 0 };
 
     // Dst
     void* dst_addr = { nullptr };
-    uint32_t dst_len = { 0 };
+    uint64_t dst_len = { 0 };
     uint32_t dst_stream = { strmHost };
     uint32_t dst_dest = { 0 };
 };

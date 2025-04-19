@@ -49,13 +49,16 @@ echo " "
 ## Insert the driver for the FPGA with the required IP- and MAC-Address
 ## 
 
+var_IP="DEVICE_${DEVICE}_IP_ADDRESS_HEX_0"
+var_MAC="DEVICE_${DEVICE}_MAC_ADDRESS_0"
+
 if [ $DRV_INSERT -eq 1 ]; then 
     echo "***"
     echo "** Inserting the driver from $DRV_PATH"
     echo "***"
-    echo "** IP_ADDRESS: $DEVICE_1_IP_ADDRESS_HEX_0"
-    echo "** MAC_ADDRESS: $DEVICE_1_MAC_ADDRESS_0"
-    hdev program driver -i $DRV_PATH -p ip_addr=$DEVICE_1_IP_ADDRESS_HEX_0,mac_addr=$DEVICE_1_MAC_ADDRESS_0
+    echo "** IP_ADDRESS: ${!var_IP}"
+    echo "** MAC_ADDRESS: ${!var_MAC}"
+    hdev program driver -i $DRV_PATH -p ip_addr=${!var_IP},mac_addr=${!var_MAC}
     # hdev program driver -m $DRV_PATH
     echo "***"
     echo "** Driver loaded "

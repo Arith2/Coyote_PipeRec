@@ -24,3 +24,7 @@ set(EXEC test)
 add_executable(${EXEC} ${TARGET_DIR}/main.cpp)
 target_link_libraries(${EXEC} PUBLIC Coyote)
 target_link_directories(${EXEC} PUBLIC /usr/local/lib)
+
+# Target GPU architecture - gfx90 corresponds to MI210 - change as needed
+set(AMD_GPU "gfx90a" CACHE STRING "Target GPU platform")
+set_property(TARGET ${EXEC} PROPERTY HIP_ARCHITECTURES ${AMD_GPU})

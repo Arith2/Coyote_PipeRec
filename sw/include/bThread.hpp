@@ -200,6 +200,7 @@ public:
     void connClose(bool client);
 
 	void* initRDMA(uint32_t buffer_size, uint16_t port, const char* server_address = nullptr);
+    void* initRDMA_GPU(uint32_t buffer_size, uint16_t port, const char* server_address = nullptr);
 	void closeRDMA();
 
     /**

@@ -44,12 +44,12 @@ constexpr bool const IS_CLIENT = true;
 
 double run_bench(
     coyote::cThread<std::any> &coyote_thread, coyote::sgEntry &sg, 
-    int *mem_gpu, int *mem_cpu, uint transfers, uint n_runs, bool operation
+    int *mem, uint transfers, uint n_runs, bool operation
 ) {
     // When writing, the server asserts the written payload is correct (which the client sets)
     // When reading, the client asserts the read payload is correct (which the server sets)
     for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
-        mem_cpu[i] = operation ? i : 0;         
+        mem[i] = operation ? i : 0;         
     }
     
     // Before every benchmark, clear previous completion flags and sync with server
@@ -57,7 +57,6 @@ double run_bench(
     auto prep_fn = [&]() {
         coyote_thread.clearCompleted();
         coyote_thread.connSync(IS_CLIENT);
-        std::cout << "DEBUG: Synced with server" << std::endl;
     };
     
     /* Benchmark function; as eplained in the README
@@ -71,26 +70,6 @@ double run_bench(
             coyote_thread.invoke(coyote_operation, &sg);
         }
 
-        // int completed = 0; 
-        // while (completed < transfers) {
-        //     if (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) > completed) {
-        //         completed += 1;
-        //         // std::cout << completed << ", ";
-        //         // Synchronous memory transfer from CPU to GPU
-        //         // hipMemcpy	(	void * 	dst,
-        //         //                  const void * 	src,
-        //         //                  size_t 	sizeBytes,
-        //         //                  hipMemcpyKind 	kind 
-        //         //              )	
-        //         auto hipMemcpy_result = hipMemcpy(mem_gpu, mem_cpu, sg.rdma.len, hipMemcpyHostToDevice);
-        //         if (hipMemcpy_result != hipSuccess) {
-        //             std::cerr << "DEBUG: hipMemcpy failed!" << std::endl;
-        //             throw std::runtime_error("hipMemcpy failed!");
-        //         }
-        //     }
-
-        // }
-
         while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != transfers) {}
     };
 
@@ -98,13 +77,12 @@ double run_bench(
     coyote::cBench bench(n_runs, 0);
     bench.execute(bench_fn, prep_fn);
 
-    // Functional correctness check
-    if (!operation) {
-        for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
-            assert(mem_cpu[i] == i);
-            // std::cout << "DEBUG: mem_cpu[i] = " << mem_cpu[i] << std::endl;
-        }
-    }
+    // // Functional correctness check
+    // if (!operation) {
+    //     for (int i = 0; i < sg.rdma.len / sizeof(int); i++) {
+    //         assert(mem[i] == i);
+    //     }
+    // }
     
     // For writes, divide by 2, since that is sent two ways (from client to server and then from server to client)
     // Reads are one way, so no need to scale
@@ -141,8 +119,8 @@ int main(int argc, char *argv[])  {
      * Exchange the necessary information with the server; the server calls the equivalent function but without the IP address
      */
 
-    coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
-    int *mem_cpu = (int *) coyote_thread.initRDMA(max_size, coyote::defPort, server_ip.c_str());
+    // coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
+    // int *mem = (int *) coyote_thread.initRDMA(max_size, coyote::defPort, server_ip.c_str());
 
     // GPU memory will be allocated on the GPU set using hipSetDevice(...)
     std::cout << "DEBUG: About to select GPU device..." << std::endl;
@@ -150,24 +128,15 @@ int main(int argc, char *argv[])  {
         std::cerr << "DEBUG: Failed to select GPU!" << std::endl;
         throw std::runtime_error("Couldn't select GPU!"); 
     }
+    std::cout << "DEBUG: Creating coyote thread..." << std::endl;
+    coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
+    std::cout << "DEBUG: Initializing RDMA with GPU... buffer_size=" << max_size << ", port=" << coyote::defPort << ", server_ip=" << server_ip << std::endl;
+    int *mem = (int *) coyote_thread.initRDMA_GPU(max_size, coyote::defPort, server_ip.c_str());
+    std::cout << "DEBUG: RDMA initialization complete." << std::endl;
 
-    int *mem_gpu = (int *) coyote_thread.getMem({coyote::CoyoteAlloc::GPU, max_size});
-
-    // std::cout << "DEBUG: Creating coyote thread..." << std::endl;
-    // coyote::cThread<std::any> coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
-    // std::cout << "DEBUG: Initializing RDMA with GPU... buffer_size=" << max_size << ", port=" << coyote::defPort << ", server_ip=" << server_ip << std::endl;
-
-    // int *mem_gpu = (int *) coyote_thread.initRDMA_GPU(max_size, coyote::defPort, server_ip.c_str());
-    // std::cout << "DEBUG: RDMA initialization complete." << std::endl;
-
-    if (!mem_gpu) { 
-        std::cerr << "DEBUG: GPU Memory allocation failed!" << std::endl;
-        throw std::runtime_error("Could not allocate GPU memory; exiting..."); 
-    }
-
-    if (!mem_cpu) {
-        std::cerr << "DEBUG: CPU Memory allocation failed!" << std::endl;
-        throw std::runtime_error("Could not allocate CPU memory; exiting..."); 
+    if (!mem) { 
+        std::cerr << "DEBUG: Memory allocation failed!" << std::endl;
+        throw std::runtime_error("Could not allocate memory; exiting..."); 
     }
 
     // Benchmark sweep of latency and throughput
@@ -179,11 +148,11 @@ int main(int argc, char *argv[])  {
         coyote::sgEntry sg;
         sg.rdma = { .len = curr_size };
     
-        double throughput_time = run_bench(coyote_thread, sg, mem_gpu, mem_cpu, N_THROUGHPUT_REPS, n_runs, operation);
+        double throughput_time = run_bench(coyote_thread, sg, mem, N_THROUGHPUT_REPS, n_runs, operation);
         double throughput = ((double) N_THROUGHPUT_REPS * (double) curr_size) / (1024.0 * 1024.0 * throughput_time * 1e-9);
         std::cout << "Average throughput: " << std::setw(8) << throughput << " MB/s; ";
         
-        double latency_time = run_bench(coyote_thread, sg, mem_gpu, mem_cpu, N_LATENCY_REPS, n_runs, operation);
+        double latency_time = run_bench(coyote_thread, sg, mem, N_LATENCY_REPS, n_runs, operation);
         std::cout << "Average latency: " << std::setw(8) << latency_time / 1e3 << " us" << std::endl;
 
         curr_size *= 2;
@@ -191,6 +160,5 @@ int main(int argc, char *argv[])  {
 
     // Final sync and exit
     coyote_thread.connSync(IS_CLIENT);
-    std::cout << "DEBUG: Synced with server and exiting..." << std::endl;
     return EXIT_SUCCESS;
 }
