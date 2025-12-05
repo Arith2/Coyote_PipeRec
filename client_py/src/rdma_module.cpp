@@ -17,6 +17,7 @@ private:
     unsigned int max_size;
     std::string server_ip;
     hipStream_t stream;  // HIP stream for async operations
+    bool enable_rdma; 
 
     // Helper function to get CPU data as numpy array
     py::array_t<int> get_cpu_data(unsigned int size) {
@@ -39,18 +40,32 @@ private:
     }
 
 public:
-    RDMAClient(const std::string& ip, unsigned int buffer_size) 
-        : coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0), 
+    RDMAClient(const std::string& ip,
+               unsigned int buffer_size,
+               bool enable_rdma_ = true)
+        : coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0),
+          mem_cpu(nullptr),
+          mem_gpu(nullptr),
           max_size(buffer_size),
-          server_ip(ip) {
+          server_ip(ip),
+          enable_rdma(enable_rdma_) {
         
-        // Initialize RDMA and allocate CPU memory
-        mem_cpu = (int *) coyote_thread.initRDMA(max_size, coyote::defPort, server_ip.c_str());
-        if (!mem_cpu) {
-            throw std::runtime_error("Could not allocate CPU memory");
+        if (enable_rdma) {
+            // 原来的 RDMA 初始化
+            mem_cpu = (int *) coyote_thread.initRDMA(max_size, coyote::defPort, server_ip.c_str());
+            if (!mem_cpu) {
+                throw std::runtime_error("Could not allocate CPU memory via RDMA");
+            }
+        } else {
+            // 纯本地：直接在 host 上分配 pinned 或普通内存
+            // pinned 版本（推荐）：
+            if (hipHostMalloc((void**)&mem_cpu, max_size) != hipSuccess) {
+                throw std::runtime_error("hipHostMalloc failed for mem_cpu");
+            }
+            // 或者简单 new[]： mem_cpu = new int[max_size / sizeof(int)];
         }
 
-        // Initialize GPU and allocate GPU memory
+        // GPU 部分可以保留不变（也可以加一个 enable_gpu flag）
         if (hipSetDevice(DEFAULT_GPU_ID)) {
             throw std::runtime_error("Could not select GPU device");
         }
@@ -60,7 +75,6 @@ public:
             throw std::runtime_error("Could not allocate GPU memory");
         }
 
-        // Create HIP stream
         if (hipStreamCreate(&stream) != hipSuccess) {
             throw std::runtime_error("Could not create HIP stream");
         }
@@ -140,6 +154,47 @@ public:
 
         return measured_time;
     }
+
+    double local_process_to_gpu(unsigned int size,
+                            unsigned int n_transfers,
+                            py::function process_fn) {
+        if (size > max_size) {
+            throw std::runtime_error("Requested size exceeds buffer size");
+        }
+
+        auto begin_time = std::chrono::high_resolution_clock::now();
+
+        for (unsigned int i = 0; i < n_transfers; i++) {
+            // 1) 把 mem_cpu 暴露成 numpy array
+            auto cpu_data = get_cpu_data(size);
+
+            // 2) 调用 Python 预处理函数，生成新的 result 数组
+            py::object result = process_fn(cpu_data);
+
+            // 3) 把返回值转成 float array（和 rdma_process_to_gpu 一致）
+            py::array_t<float> processed_data = result.cast<py::array_t<float>>();
+            py::buffer_info buf = processed_data.request();
+
+            if (buf.size * sizeof(float) != size) {
+                throw std::runtime_error("processed_data size mismatch");
+            }
+
+            // 4) 把 result 拷到 GPU
+            auto hipMemcpy_result = hipMemcpy(mem_gpu,
+                                              buf.ptr,
+                                              size,
+                                              hipMemcpyHostToDevice);
+            if (hipMemcpy_result != hipSuccess) {
+                throw std::runtime_error("hipMemcpy failed in local_process_to_gpu");
+            }
+        }
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+            end_time - begin_time
+        ).count();
+    }
+
 
     // New function: Read data to CPU, process it in Python, then transfer to GPU
     double rdma_process_to_gpu(unsigned int size, unsigned int n_transfers, py::function process_fn, bool is_write = false) {
@@ -262,13 +317,17 @@ public:
 
     ~RDMAClient() {
         try {
-            // Cleanup HIP stream
             hipStreamDestroy(stream);
-            // Final sync with server before cleanup
-            coyote_thread.connSync(true);
-        } catch (...) {
-            // Ignore errors during cleanup
-        }
+
+            if (enable_rdma) {
+                coyote_thread.connSync(true);
+            } else {
+                // 本地模式下释放 mem_cpu
+                if (mem_cpu) {
+                    hipHostFree(mem_cpu);  // 或 delete[]
+                }
+            }
+        } catch (...) {}
     }
 };
 
@@ -276,7 +335,10 @@ PYBIND11_MODULE(rdma_module, m) {
     m.doc() = "RDMA client module for data transfer between CPU and GPU";
 
     py::class_<RDMAClient>(m, "RDMAClient")
-        .def(py::init<const std::string&, unsigned int>())
+        .def(py::init<const std::string&, unsigned int, bool>(),
+            py::arg("ip"),
+            py::arg("buffer_size"),
+            py::arg("enable_rdma") = true)
         .def("rdma_cpu", &RDMAClient::rdma_cpu, 
              py::arg("size"), 
              py::arg("n_transfers"),
@@ -287,6 +349,11 @@ PYBIND11_MODULE(rdma_module, m) {
              py::arg("n_transfers"),
              py::arg("is_write") = false,
              "Read data via RDMA to CPU and transfer to GPU")
+        .def("local_process_to_gpu", &RDMAClient::local_process_to_gpu,
+            py::arg("size"),
+            py::arg("n_transfers"),
+            py::arg("process_fn"),
+            "Local CPU baseline: mem_cpu -> Python process -> H2D -> GPU")
         .def("rdma_process_to_gpu", &RDMAClient::rdma_process_to_gpu,
              py::arg("size"),
              py::arg("n_transfers"),

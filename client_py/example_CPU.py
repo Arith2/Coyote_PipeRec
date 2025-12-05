@@ -167,6 +167,53 @@ def process_data_mt_inplace(data: np.ndarray, n_threads: int) -> np.ndarray:
 
     return result.ravel()
 
+def run_local_baseline(client, transfer_sizes, n_transfers=64, n_runs=10, n_threads=None):
+    # 和之前一样决定用哪个 process function
+    if n_threads is None or n_threads <= 1:
+        def proc_fn(data):
+            return process_data_single(data)
+    else:
+        def proc_fn(data):
+            return process_data_mt_inplace(data, n_threads)
+
+    print("\n=== Local CPU Baseline (no RDMA) ===")
+    print(f"Running with {n_threads} threads for preprocessing")
+
+    col1_width = 15
+    col2_width = 20
+    col3_width = 20
+
+    print(f"{'Size (bytes)'.ljust(col1_width)} "
+          f"{'Time (us)'.ljust(col2_width)} "
+          f"{'Throughput (MB/s)'.ljust(col3_width)}")
+    print("-" * (col1_width + col2_width + col3_width + 2))
+
+    for size in transfer_sizes:
+        if size % (48 * 4) != 0:
+            print(f"Skipping size {size}, not divisible by 48*4 bytes")
+            continue
+
+        # 在 mem_cpu 里填随机数（只要做一次也可以）
+        cpu_arr = client.read_cpu_memory(size)
+        cpu_arr[...] = np.random.randint(
+            low=0,
+            high=10000,
+            size=cpu_arr.shape,
+            dtype=np.int32,
+        )
+
+        total_time = 0.0
+        for _ in range(n_runs):
+            elapsed = client.local_process_to_gpu(size, n_transfers, proc_fn)
+            total_time += elapsed
+
+        avg_time_us = total_time / n_runs * 1e-3  # ns -> us
+        throughput = (size * n_transfers * 1e6) / (avg_time_us * 1024 * 1024)
+
+        print(f"{str(size).ljust(col1_width)} "
+              f"{f'{avg_time_us:.2f}'.ljust(col2_width)} "
+              f"{f'{throughput:.2f}'.ljust(col3_width)}")
+
 
 def run_benchmark(client, transfer_sizes, n_transfers=10, n_runs=10, n_threads=None):
     print("\n=== RDMA Benchmark ===")
@@ -267,10 +314,15 @@ def main():
     # transfer_sizes = []
     # transfer_sizes = [3145728]
     
-    print(f"Initializing RDMA client with server IP: {args.server_ip}")
-    client = RDMAClient(args.server_ip, args.buffer_size)
-    
-    run_benchmark(client, transfer_sizes, args.n_transfers, args.n_runs, args.threads)
+    # # print(f"Initializing RDMA client with server IP: {args.server_ip}")
+    # client = RDMAClient(args.server_ip, args.buffer_size)
+    # # run_benchmark(client, transfer_sizes, args.n_transfers, args.n_runs, args.threads)
+    # run_local_baseline(client, transfer_sizes, args.n_transfers, args.n_runs, args.threads)
+
+    # 本地 baseline：不需要 server，enable_rdma=False
+    client = RDMAClient("127.0.0.1", args.buffer_size, False)
+    run_local_baseline(client, transfer_sizes, args.n_transfers, args.n_runs, args.threads)
+
 
 if __name__ == "__main__":
     main() 
