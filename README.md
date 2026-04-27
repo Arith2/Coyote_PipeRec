@@ -30,6 +30,21 @@ Some of **Coyote's** features:
 
 ## [For more detailed information, check out the documentation](https://fpgasystems.github.io/Coyote/)
 
+## Featured tutorial: line-rate recommender-system preprocessing on BALBOA
+
+This branch (**Coyote_PipeRec**) ships a worked example that reproduces the recommender-system preprocessing case study from the *RoCE BALBOA* paper [[arXiv:2507.20412](https://arxiv.org/abs/2507.20412)]. As stated in the paper:
+
+> *"… implementing commercial data preprocessing pipelines for recommender systems that process the data as it arrives from the network before transferring it directly to the GPU."*
+> — Heer, Ramhorst, Zhu, Liu, Hu, Dann, Alonso. *RoCE BALBOA: Service-enhanced Data Center RDMA for SmartNICs* (2025)
+
+BALBOA is the open-source, RoCE v2-compatible, 100G-capable RDMA stack used inside Coyote. The paper demonstrates BALBOA in two classes of use cases — infrastructure enhancements (encryption, ML-driven deep packet inspection) and **line-rate compute offloads with deep pipelines**, with the recommender-system data-preprocessing pipeline as the headline example for the latter. The featured tutorial lives in [`examples/10_preprocess_rdma`](examples/10_preprocess_rdma/) and demonstrates:
+
+- A 100G RoCE v2 RDMA flow between two FPGA-equipped nodes, running Coyote's BALBOA stack.
+- An HLS preprocessing kernel placed **inline on the RDMA receive path** inside the vFPGA, applying DLRM-style dense-feature transformations (clip-negatives-to-zero, `log(x + 1)`) at line rate over 16 × 32-bit lanes per 512-bit AXIS beat — i.e. processing each incoming packet *before* it lands in host or GPU memory.
+- Direct staging of the preprocessed payload into GPU memory: either CPU-staged via `hipMemcpy(HostToDevice)` after each RDMA `LOCAL_WRITE` completion, or via GPU-direct RDMA through `initRDMA_GPU` (variant `main_rdma_gpu.cpp` included).
+
+The full pipeline description, hardware/software build instructions, and current known issues are documented in [`examples/10_preprocess_rdma/README.md`](examples/10_preprocess_rdma/README.md). The earlier example [`examples/09_preprocess`](examples/09_preprocess/) shows the same DLRM-style preprocessing operators without the RDMA front-end, and [`examples/08_perf_rdma`](examples/08_perf_rdma/) shows the bare RDMA SmartNIC path without any preprocessing.
+
 ## Prerequisites
 
 Full `Vivado/Vitis` suite is needed to build the hardware side of things. Hardware server will be enough for deployment only scenarios. Coyote runs with `Vivado 2022.1`. Previous versions can be used at one's own peril.  
@@ -198,6 +213,20 @@ To program Coyote to a remote server, `util/program_hacc_remote.sh` may be used 
     pages = {991--1010},
     url = {https://www.usenix.org/conference/osdi20/presentation/roscoe},
     publisher = {{USENIX} Association}
+}
+```
+
+#### If you use the BALBOA RDMA stack or the recommender-preprocessing tutorial, also cite :
+
+```bibtex
+@misc{balboa2025,
+    author = {Maximilian Jakob Heer and Benjamin Ramhorst and Yu Zhu and Luhao Liu and Zhiyi Hu and Jonas Dann and Gustavo Alonso},
+    title = {{RoCE BALBOA}: Service-enhanced Data Center {RDMA} for {SmartNICs}},
+    year = {2025},
+    eprint = {2507.20412},
+    archivePrefix = {arXiv},
+    primaryClass = {cs.NI},
+    url = {https://arxiv.org/abs/2507.20412}
 }
 ```
 
