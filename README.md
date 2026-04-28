@@ -45,6 +45,8 @@ BALBOA is the open-source, RoCE v2-compatible, 100G-capable RDMA stack used insi
 
 The full pipeline description, hardware/software build instructions, and current known issues are documented in [`examples/10_preprocess_rdma/README.md`](examples/10_preprocess_rdma/README.md). The earlier example [`examples/09_preprocess`](examples/09_preprocess/) shows the same DLRM-style preprocessing operators without the RDMA front-end, and [`examples/08_perf_rdma`](examples/08_perf_rdma/) shows the bare RDMA SmartNIC path without any preprocessing.
 
+A CPU/NumPy software baseline for the same preprocessing pipeline is provided in [`client_py/example_CPU.py`](client_py/example_CPU.py). It supports single-threaded and multi-threaded (`--threads N`) execution and sweeps the same transfer-size grid used in `examples/10_preprocess_rdma`, so its MB/s numbers are directly comparable to the FPGA-accelerated results.
+
 ## Prerequisites
 
 Full `Vivado/Vitis` suite is needed to build the hardware side of things. Hardware server will be enough for deployment only scenarios. Coyote runs with `Vivado 2022.1`. Previous versions can be used at one's own peril.  
